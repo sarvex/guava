@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 The Guava Authors
+ * Copyright (C) 2015 The Guava Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,23 +14,19 @@
  * limitations under the License.
  */
 
-package com.google.common.collect;
-
-import java.util.Collections;
+package com.google.common.util.concurrent;
 
 /**
- * GWT emulation of {@link EmptyImmutableBiMap}.
- *
- * @author Hayward Chan
+ * Emulation for InterruptibleTask in GWT.
  */
-@SuppressWarnings("serial")
-final class EmptyImmutableBiMap extends ImmutableBiMap<Object, Object> {
-  static final EmptyImmutableBiMap INSTANCE = new EmptyImmutableBiMap();
+abstract class InterruptibleTask implements Runnable {
+  @Override public void run() {
+    runInterruptibly();
+  }
 
-  private EmptyImmutableBiMap() {
-    super(Collections.emptyMap());
-  }
-  @Override public ImmutableBiMap<Object, Object> inverse() {
-    return this;
-  }
+  abstract void runInterruptibly();
+
+  abstract boolean wasInterrupted();
+
+  final void interruptTask() {}
 }

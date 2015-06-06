@@ -55,7 +55,7 @@ import javax.annotation.Nullable;
  * @author Kevin Bourrillion
  * @author Jared Levy
  * @author Chris Povirk
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible(emulated = true)
 public final class Sets {
@@ -468,14 +468,15 @@ public final class Sets {
    *   Set<Object> identityHashSet = Sets.newSetFromMap(
    *       new IdentityHashMap<Object, Boolean>());}</pre>
    *
-   * <p>This method has the same behavior as the JDK 6 method
-   * {@code Collections.newSetFromMap()}. The returned set is serializable if
-   * the backing map is.
+   * <p>The returned set is serializable if the backing map is.
    *
    * @param map the backing map
    * @return the set backed by the map
    * @throws IllegalArgumentException if {@code map} is not empty
+   * @deprecated Use {@link Collections#newSetFromMap} instead. This method
+   *     will be removed in August 2017.
    */
+  @Deprecated
   public static <E> Set<E> newSetFromMap(Map<E, Boolean> map) {
     return Platform.newSetFromMap(map);
   }
@@ -488,7 +489,7 @@ public final class Sets {
    * as a plain {@link Set}, or immediately invoke {@link #immutableCopy} or
    * {@link #copyInto} and forget the {@code SetView} itself.
    *
-   * @since 2.0 (imported from Google Collections Library)
+   * @since 2.0
    */
   public abstract static class SetView<E> extends AbstractSet<E> {
     private SetView() {} // no subclasses but our own

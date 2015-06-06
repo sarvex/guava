@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  * Function}</a>.
  *
  * @author Kevin Bourrillion
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible
 public interface Function<F, T> {
@@ -48,7 +48,8 @@ public interface Function<F, T> {
    * @throws NullPointerException if {@code input} is null and this function does not accept null
    *     arguments
    */
-  @Nullable T apply(@Nullable F input);
+  @Nullable
+  T apply(@Nullable F input);
 
   /**
    * Indicates whether another object is equal to this function.

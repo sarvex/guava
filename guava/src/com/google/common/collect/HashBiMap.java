@@ -17,6 +17,7 @@ package com.google.common.collect;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.CollectPreconditions.checkNonnegative;
 import static com.google.common.collect.CollectPreconditions.checkRemove;
+import static com.google.common.collect.Hashing.smearedHash;
 
 import com.google.common.annotations.GwtCompatible;
 import com.google.common.annotations.GwtIncompatible;
@@ -47,10 +48,10 @@ import javax.annotation.Nullable;
  *
  * @author Louis Wasserman
  * @author Mike Bostock
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible(emulated = true)
-public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V> 
+public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
     implements BiMap<K, V>, Serializable {
 
   /**
@@ -83,12 +84,8 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
   private static final class BiEntry<K, V> extends ImmutableEntry<K, V> {
     final int keyHash;
     final int valueHash;
-
-    @Nullable
-    BiEntry<K, V> nextInKToVBucket;
-
-    @Nullable
-    BiEntry<K, V> nextInVToKBucket;
+    @Nullable BiEntry<K, V> nextInKToVBucket;
+    @Nullable BiEntry<K, V> nextInVToKBucket;
 
     BiEntry(K key, int keyHash, V value, int valueHash) {
       super(key, value);
@@ -98,7 +95,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
   }
 
   private static final double LOAD_FACTOR = 1.0;
-  
+
   private transient BiEntry<K, V>[] hashTableKToV;
   private transient BiEntry<K, V>[] hashTableVToK;
   private transient int size;
@@ -126,7 +123,8 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
   private void delete(BiEntry<K, V> entry) {
     int keyBucket = entry.keyHash & mask;
     BiEntry<K, V> prevBucketEntry = null;
-    for (BiEntry<K, V> bucketEntry = hashTableKToV[keyBucket]; true;
+    for (BiEntry<K, V> bucketEntry = hashTableKToV[keyBucket];
+        true;
         bucketEntry = bucketEntry.nextInKToVBucket) {
       if (bucketEntry == entry) {
         if (prevBucketEntry == null) {
@@ -141,7 +139,8 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
 
     int valueBucket = entry.valueHash & mask;
     prevBucketEntry = null;
-    for (BiEntry<K, V> bucketEntry = hashTableVToK[valueBucket];;
+    for (BiEntry<K, V> bucketEntry = hashTableVToK[valueBucket];
+        true;
         bucketEntry = bucketEntry.nextInVToKBucket) {
       if (bucketEntry == entry) {
         if (prevBucketEntry == null) {
@@ -171,12 +170,9 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
     modCount++;
   }
 
-  private static int hash(@Nullable Object o) {
-    return Hashing.smear((o == null) ? 0 : o.hashCode());
-  }
-
   private BiEntry<K, V> seekByKey(@Nullable Object key, int keyHash) {
-    for (BiEntry<K, V> entry = hashTableKToV[keyHash & mask]; entry != null;
+    for (BiEntry<K, V> entry = hashTableKToV[keyHash & mask];
+        entry != null;
         entry = entry.nextInKToVBucket) {
       if (keyHash == entry.keyHash && Objects.equal(key, entry.key)) {
         return entry;
@@ -186,7 +182,8 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
   }
 
   private BiEntry<K, V> seekByValue(@Nullable Object value, int valueHash) {
-    for (BiEntry<K, V> entry = hashTableVToK[valueHash & mask]; entry != null;
+    for (BiEntry<K, V> entry = hashTableVToK[valueHash & mask];
+        entry != null;
         entry = entry.nextInVToKBucket) {
       if (valueHash == entry.valueHash && Objects.equal(value, entry.value)) {
         return entry;
@@ -197,19 +194,18 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
 
   @Override
   public boolean containsKey(@Nullable Object key) {
-    return seekByKey(key, hash(key)) != null;
+    return seekByKey(key, smearedHash(key)) != null;
   }
 
   @Override
   public boolean containsValue(@Nullable Object value) {
-    return seekByValue(value, hash(value)) != null;
+    return seekByValue(value, smearedHash(value)) != null;
   }
 
   @Nullable
   @Override
   public V get(@Nullable Object key) {
-    BiEntry<K, V> entry = seekByKey(key, hash(key));
-    return (entry == null) ? null : entry.value;
+    return Maps.valueOrNull(seekByKey(key, smearedHash(key)));
   }
 
   @Override
@@ -223,11 +219,12 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
   }
 
   private V put(@Nullable K key, @Nullable V value, boolean force) {
-    int keyHash = hash(key);
-    int valueHash = hash(value);
+    int keyHash = smearedHash(key);
+    int valueHash = smearedHash(value);
 
     BiEntry<K, V> oldEntryForKey = seekByKey(key, keyHash);
-    if (oldEntryForKey != null && valueHash == oldEntryForKey.valueHash
+    if (oldEntryForKey != null
+        && valueHash == oldEntryForKey.valueHash
         && Objects.equal(value, oldEntryForKey.value)) {
       return value;
     }
@@ -247,16 +244,17 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
     BiEntry<K, V> newEntry = new BiEntry<K, V>(key, keyHash, value, valueHash);
     insert(newEntry);
     rehashIfNecessary();
-    return (oldEntryForKey == null) ? null : oldEntryForKey.value;
+    return Maps.valueOrNull(oldEntryForKey);
   }
 
   @Nullable
   private K putInverse(@Nullable V value, @Nullable K key, boolean force) {
-    int valueHash = hash(value);
-    int keyHash = hash(key);
+    int valueHash = smearedHash(value);
+    int keyHash = smearedHash(key);
 
     BiEntry<K, V> oldEntryForValue = seekByValue(value, valueHash);
-    if (oldEntryForValue != null && keyHash == oldEntryForValue.keyHash
+    if (oldEntryForValue != null
+        && keyHash == oldEntryForValue.keyHash
         && Objects.equal(key, oldEntryForValue.key)) {
       return key;
     }
@@ -276,7 +274,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
     BiEntry<K, V> newEntry = new BiEntry<K, V>(key, keyHash, value, valueHash);
     insert(newEntry);
     rehashIfNecessary();
-    return (oldEntryForValue == null) ? null : oldEntryForValue.key;
+    return Maps.keyOrNull(oldEntryForValue);
   }
 
   private void rehashIfNecessary() {
@@ -308,7 +306,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
 
   @Override
   public V remove(@Nullable Object key) {
-    BiEntry<K, V> entry = seekByKey(key, hash(key));
+    BiEntry<K, V> entry = seekByKey(key, smearedHash(key));
     if (entry == null) {
       return null;
     } else {
@@ -405,7 +403,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
 
     @Override
     public boolean remove(@Nullable Object o) {
-      BiEntry<K, V> entry = seekByKey(o, hash(o));
+      BiEntry<K, V> entry = seekByKey(o, smearedHash(o));
       if (entry == null) {
         return false;
       } else {
@@ -435,22 +433,24 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
           this.delegate = entry;
         }
 
-        @Override public K getKey() {
+        @Override
+        public K getKey() {
           return delegate.key;
         }
 
-        @Override public V getValue() {
+        @Override
+        public V getValue() {
           return delegate.value;
         }
 
-        @Override public V setValue(V value) {
+        @Override
+        public V setValue(V value) {
           V oldValue = delegate.value;
-          int valueHash = hash(value);
+          int valueHash = smearedHash(value);
           if (valueHash == delegate.valueHash && Objects.equal(value, oldValue)) {
             return value;
           }
-          checkArgument(
-              seekByValue(value, valueHash) == null, "value already present: %s", value);
+          checkArgument(seekByValue(value, valueHash) == null, "value already present: %s", value);
           delete(delegate);
           BiEntry<K, V> newEntry =
               new BiEntry<K, V>(delegate.key, delegate.keyHash, value, valueHash);
@@ -495,8 +495,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
 
     @Override
     public K get(@Nullable Object value) {
-      BiEntry<K, V> entry = seekByValue(value, hash(value));
-      return (entry == null) ? null : entry.key;
+      return Maps.keyOrNull(seekByValue(value, smearedHash(value)));
     }
 
     @Override
@@ -511,7 +510,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
 
     @Override
     public K remove(@Nullable Object value) {
-      BiEntry<K, V> entry = seekByValue(value, hash(value));
+      BiEntry<K, V> entry = seekByValue(value, smearedHash(value));
       if (entry == null) {
         return null;
       } else {
@@ -537,7 +536,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
 
       @Override
       public boolean remove(@Nullable Object o) {
-        BiEntry<K, V> entry = seekByValue(o, hash(o));
+        BiEntry<K, V> entry = seekByValue(o, smearedHash(o));
         if (entry == null) {
           return false;
         } else {
@@ -549,7 +548,8 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
       @Override
       public Iterator<V> iterator() {
         return new Itr<V>() {
-          @Override V output(BiEntry<K, V> entry) {
+          @Override
+          V output(BiEntry<K, V> entry) {
             return entry.value;
           }
         };
@@ -598,7 +598,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
               @Override
               public K setValue(K key) {
                 K oldKey = delegate.key;
-                int keyHash = hash(key);
+                int keyHash = smearedHash(key);
                 if (keyHash == delegate.keyHash && Objects.equal(key, oldKey)) {
                   return key;
                 }
@@ -606,6 +606,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
                 delete(delegate);
                 BiEntry<K, V> newEntry =
                     new BiEntry<K, V>(key, keyHash, delegate.value, delegate.valueHash);
+                delegate = newEntry;
                 insert(newEntry);
                 expectedModCount = modCount;
                 // This is safe because entries can only get bumped up to earlier in the iteration,

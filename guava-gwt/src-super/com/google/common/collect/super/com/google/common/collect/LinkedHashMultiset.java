@@ -34,7 +34,7 @@ import java.util.LinkedHashMap;
  *
  * @author Kevin Bourrillion
  * @author Jared Levy
- * @since 2.0 (imported from Google Collections Library)
+ * @since 2.0
  */
 @GwtCompatible(serializable = true, emulated = true)
 @SuppressWarnings("serial") // we're overriding default serialization
@@ -80,8 +80,7 @@ public final class LinkedHashMultiset<E> extends AbstractMapBasedMultiset<E> {
   }
 
   private LinkedHashMultiset(int distinctElements) {
-    // Could use newLinkedHashMapWithExpectedSize() if it existed
-    super(new LinkedHashMap<E, Count>(Maps.capacity(distinctElements)));
+    super(Maps.<E, Count>newLinkedHashMapWithExpectedSize(distinctElements));
   }
 }
 
